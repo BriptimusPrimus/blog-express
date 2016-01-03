@@ -1,3 +1,6 @@
+var TWITTER_CONSUMER_KEY = process.env.TWITTER_CONSUMER_KEY
+var TWITTER_CONSUMER_SECRET = process.env.TWITTER_CONSUMER_SECRET
+
 var express = require('express'),
   routes = require('./routes'),
   http = require('http'),
@@ -8,7 +11,8 @@ var express = require('express'),
   collections = {
     articles: db.collection('articles'),
     users: db.collection('users')
-  };
+  },
+  everyauth = require('everyauth');
 
 // Express.js Middleware
 var session = require('express-session'),
@@ -17,6 +21,33 @@ var session = require('express-session'),
   cookieParser = require('cookie-parser'),
   bodyParser = require('body-parser'),
   methodOverride = require('method-override');
+
+everyauth.debug = true;
+everyauth.twitter
+  .consumerKey(TWITTER_CONSUMER_KEY)
+  .consumerSecret(TWITTER_CONSUMER_SECRET)
+  .findOrCreateUser( function (session, accessToken, accessTokenSecret, twitterUserMetadata) {
+    var promise = this.Promise();
+    process.nextTick(function(){
+        if (twitterUserMetadata.screen_name === 'azat_co') {
+          session.user = twitterUserMetadata;
+          session.admin = true;
+        }
+        promise.fulfill(twitterUserMetadata);
+    })
+    return promise;
+    // return twitterUserMetadata
+  })
+  .redirectPath('/admin');
+
+//we need it because otherwise the session will be kept alive
+//the Express.js request is intercepted by Everyauth automatically added /logout
+//and never makes it to our /logout
+everyauth.everymodule.handleLogout(routes.user.logout);
+
+everyauth.everymodule.findUserById( function (user, callback) {
+  callback(user)
+});
 
 var app = express();
 app.locals.appTitle = 'blog-express';
@@ -39,6 +70,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded());
 app.use(cookieParser('3CCC4ACD-6ED1-4844-9217-82131BDCB239'));
 app.use(session({secret: '2C44774A-D649-4D44-9535-46E296EF984F'}));
+app.use(everyauth.middleware());
 app.use(methodOverride());
 app.use(require('stylus').middleware(__dirname + '/public'));
 app.use(express.static(path.join(__dirname, 'public')));
