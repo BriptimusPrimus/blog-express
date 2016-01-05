@@ -5,13 +5,11 @@ var express = require('express'),
   routes = require('./routes'),
   http = require('http'),
   path = require('path'),
-  mongoskin = require('mongoskin'),
+  mongoose = require('mongoose'),
+  models = require('./models'),
   dbUrl = process.env.MONGOHQ_URL || 'mongodb://@localhost:27017/blog',
-  db = mongoskin.db(dbUrl, {safe: true}),
-  collections = {
-    articles: db.collection('articles'),
-    users: db.collection('users')
-  },
+  db = mongoose.connect(dbUrl, {safe: true}),
+  
   everyauth = require('everyauth');
 
 // Express.js Middleware
@@ -54,8 +52,8 @@ app.locals.appTitle = 'blog-express';
 
 // Expose collections to request handlers
 app.use(function(req, res, next) {
-  if (!collections.articles || ! collections.users) return next(new Error("No collections."))
-  req.collections = collections;
+  if (!models.Article || ! models.User) return next(new Error("No models."))
+  req.models = models;
   return next();
 });
 
@@ -91,7 +89,7 @@ var authorize = function(req, res, next) {
 };
 
 // development only
-if ('development' == app.get('env')) {
+if ('development' === app.get('env')) {
   app.use(errorHandler());
 }
 
